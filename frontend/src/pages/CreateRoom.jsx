@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
+import { Video } from "lucide-react";
 import api from "../api/api";
 
 const CreateRoom = () => {
@@ -93,12 +94,16 @@ const CreateRoom = () => {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
 
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 shadow-lg shadow-violet-600/20">
-              <span className="text-lg">▶</span>
-            </div>
+            <img
+  src="/logo.png"
+  alt="Watchly"
+  width={50}
+  height={50}
+  className="rounded-full object-cover"
+/>
 
             <span className="text-lg font-bold">
-              Watch<span className="text-violet-400">Party</span>
+              Watchly<span className="text-violet-400"></span>
             </span>
           </Link>
 
@@ -126,6 +131,10 @@ const CreateRoom = () => {
 
           {/* Heading */}
           <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-cyan-400/10 via-blue-500/10 to-violet-500/10 shadow-lg shadow-violet-500/5">
+              <Video size={24} className="text-violet-300" strokeWidth={1.8} />
+            </div>
+
             <h1 className="text-3xl font-bold sm:text-4xl">
               Create a room
             </h1>

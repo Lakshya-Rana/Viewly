@@ -44,17 +44,18 @@ const roomSchema = new mongoose.Schema(
 );
 
 // Hash room password
-roomSchema.pre("save",function () {
+roomSchema.pre("save", async function () {
   if (!this.isModified("password") || !this.password) {
-    return 
+    return;
   }
 
-  this.password = bcrypt.hash(this.password, 10);
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 // Check room password
-roomSchema.methods.isPasswordCorrect = function (password) {
-  return bcrypt.compare(password, this.password);
+roomSchema.methods.isPasswordCorrect = async function (password) {
+  if (!this.password) return false;
+  return await bcrypt.compare(password, this.password);
 };
 
 const Room = mongoose.model("Room", roomSchema);

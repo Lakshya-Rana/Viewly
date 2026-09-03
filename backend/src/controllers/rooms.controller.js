@@ -4,6 +4,14 @@ import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import crypto from "crypto";
 
+const findRoomByCode = async (code) => {
+    if (!code) return null;
+    const cleanCode = code.trim();
+    return await Room.findOne({
+        roomId: { $regex: new RegExp(`^${cleanCode}$`, "i") }
+    });
+};
+
 // CREATE ROOM
 export const createRoom = asyncHandler(async (req, res) => {
     const {
@@ -63,7 +71,7 @@ export const updateRoom = asyncHandler(async (req, res) => {
         maxParticipants,
     } = req.body;
 
-    const room = await Room.findOne({ roomId });
+    const room = await findRoomByCode(roomId);
 
     if (!room) {
         throw new apiError(404, "Room not found.");
@@ -86,7 +94,7 @@ export const updateRoom = asyncHandler(async (req, res) => {
     }
 
     if (password !== undefined) {
-        room.password = password || null;
+        room.password = password ? password.trim() : null;
     }
 
     // Don't keep a password if room is public
@@ -112,7 +120,7 @@ export const updateRoom = asyncHandler(async (req, res) => {
 export const deleteRoom = asyncHandler(async (req, res) => {
     const { roomId } = req.params;
 
-    const room = await Room.findOne({ roomId });
+    const room = await findRoomByCode(roomId);
 
     if (!room) {
         throw new apiError(404, "Room not found.");
@@ -136,7 +144,7 @@ export const deleteRoom = asyncHandler(async (req, res) => {
 export const toggleRoomStatus = asyncHandler(async (req, res) => {
     const { roomId } = req.params;
 
-    const room = await Room.findOne({ roomId });
+    const room = await findRoomByCode(roomId);
 
     if (!room) {
         throw new apiError(404, "Room not found.");
@@ -164,30 +172,38 @@ export const toggleRoomStatus = asyncHandler(async (req, res) => {
 export const getRoom = asyncHandler(async (req, res) => {
     const { roomId } = req.params;
 
-    const room = await Room.findOne({ roomId });
+    const room = await findRoomByCode(roomId);
 
     if (!room) {
         throw new apiError(404, "Room not found.");
     }
 
-    return res
-        .status(200)
-        .json(
-            new apiResponse(
-                200,
-                room,
-                "Room fetched successfully."
-            )
-        );
+    return res.status(200).json(
+        new apiResponse(
+            200,
+            {
+                roomId: room._id,
+                roomCode: room.roomId,
+                roomName: room.name,
+                isPrivate: room.isPrivate,
+                maxParticipants: room.maxParticipants,
+                isActive: room.isActive,
+            },
+            "Room fetched successfully."
+        )
+    );
 });
 
 
 // JOIN ROOM
 export const joinRoom = asyncHandler(async (req, res) => {
-    const { roomId } = req.params;
-    const { password } = req.body;
+    const { roomId, password } = req.body;
 
-    const room = await Room.findOne({ roomId });
+    if (!roomId?.trim()) {
+        throw new apiError(400, "Room code is required.");
+    }
+
+    const room = await findRoomByCode(roomId);
 
     if (!room) {
         throw new apiError(404, "Room not found.");
@@ -201,14 +217,14 @@ export const joinRoom = asyncHandler(async (req, res) => {
     }
 
     if (room.isPrivate) {
-        if (!password) {
+        if (!password || !password.trim()) {
             throw new apiError(
                 400,
-                "Password is required."
+                "Password is required for this private room."
             );
         }
 
-        const isCorrect = await room.isPasswordCorrect(password);
+        const isCorrect = await room.isPasswordCorrect(password.trim());
 
         if (!isCorrect) {
             throw new apiError(

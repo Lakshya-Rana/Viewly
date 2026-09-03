@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Play, Video, Trash2 } from "lucide-react";
 
 const MyRooms = () => {
   const navigate = useNavigate();
@@ -47,12 +48,16 @@ const MyRooms = () => {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
 
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 shadow-lg shadow-violet-600/20">
-              <span className="text-lg">▶</span>
-            </div>
+            <img
+  src="/logo.png"
+  alt="Watchly"
+  width={50}
+  height={50}
+  className="rounded-full object-cover"
+/>
 
             <span className="text-lg font-bold">
-              Watch<span className="text-violet-400">Party</span>
+              Watchly<span className="text-violet-400"></span>
             </span>
           </Link>
 
@@ -106,8 +111,8 @@ const MyRooms = () => {
         {rooms.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/[0.025] px-6 py-20 text-center">
 
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-600/10 text-3xl">
-              🎬
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-cyan-400/10 via-blue-500/10 to-violet-500/10 shadow-lg shadow-violet-500/5">
+              <Video size={28} className="text-violet-300" strokeWidth={1.8} />
             </div>
 
             <h2 className="text-xl font-semibold">
@@ -141,8 +146,8 @@ const MyRooms = () => {
                 {/* Room icon */}
                 <div className="mb-5 flex items-center justify-between">
 
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600/10 text-xl">
-                    ▶
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-cyan-400/10 via-blue-500/10 to-violet-500/10 shadow-lg shadow-violet-500/5">
+                    <Play size={18} fill="currentColor" strokeWidth={1.8} className="text-violet-300 ml-0.5" />
                   </div>
 
                   <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs text-violet-400">
@@ -183,10 +188,10 @@ const MyRooms = () => {
 
                   <button
                     onClick={() => removeRoom(room.roomId)}
-                    className="rounded-lg border border-white/10 px-3 py-2.5 text-sm text-gray-500 transition hover:border-red-500/30 hover:text-red-400"
+                    className="flex items-center justify-center rounded-lg border border-white/10 px-3 py-2.5 text-sm text-gray-500 transition hover:border-red-500/30 hover:text-red-400"
                     title="Remove from My Rooms"
                   >
-                    ✕
+                    <Trash2 size={16} />
                   </button>
 
                 </div>
