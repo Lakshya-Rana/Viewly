@@ -282,6 +282,25 @@ const Room = () => {
 
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
+      // Optimize WebRTC Video Bitrate for 1080p stream
+      const senders = pc.getSenders();
+      const videoSender = senders.find((s) => s.track && s.track.kind === "video");
+      if (videoSender && videoSender.getParameters) {
+        try {
+          const parameters = videoSender.getParameters();
+          if (!parameters.encodings || parameters.encodings.length === 0) {
+            parameters.encodings = [{}];
+          }
+          parameters.encodings[0].maxBitrate = 5000000; // 5 Mbps max bitrate for crisp 1080p
+          parameters.encodings[0].maxFramerate = 30;
+          videoSender.setParameters(parameters).catch((err) => {
+            console.warn("Could not set video bitrate parameters:", err);
+          });
+        } catch (e) {
+          console.warn("Failed to update video sender parameters:", e);
+        }
+      }
+
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("webrtc-ice-candidate", {
@@ -314,16 +333,26 @@ const Room = () => {
 
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: "always" },
+        video: {
+          cursor: "always",
+          width: { ideal: 1920, max: 1920 },
+          height: { ideal: 1080, max: 1080 },
+          frameRate: { ideal: 30, max: 60 },
+        },
         audio: true,
       });
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack && "contentHint" in videoTrack) {
+        videoTrack.contentHint = "motion";
+      }
 
       localStreamRef.current = stream;
       setScreenStream(stream);
       setIsSharingScreen(true);
       setActivePresenter({ socketId: socket.id, displayName });
 
-      stream.getVideoTracks()[0].onended = () => {
+      videoTrack.onended = () => {
         stopScreenShare();
       };
 
