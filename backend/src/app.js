@@ -176,6 +176,6 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use("/api/v1/rooms", roomRouter);
+app.use("/rooms", roomRouter);
 
 export { app, server, io };
