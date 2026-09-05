@@ -1,4 +1,111 @@
-# PRD: Party Room — Watch-Together App
+# Viewly
+
+![Viewly Logo](./assets/logo.png)
+
+## What is Viewly?
+Viewly is a **real‑time video conferencing and screen‑sharing** web application that runs entirely in the browser. Users can create a virtual “room”, invite participants via a short URL, and start high‑quality video calls with optional screen sharing—both from desktop and mobile devices. The app is built as a Single‑Page Application (SPA) and requires no native client or plug‑ins.
+
+## Features
+- **High‑definition video** – up to 1080p with adaptive bitrate to keep the stream smooth.
+- **Screen sharing** – works on desktop browsers and falls back gracefully on mobile browsers.
+- **Mobile‑friendly playback** – `playsInline`, `webkit‑playsinline`, and `x5‑playsinline` enable autoplay without user interaction.
+- **Real‑time chat** – Socket.io powered text chat alongside video.
+- **SPA routing** – Deep links (`/room/:id`) work on page reloads thanks to Vercel/Netlify rewrite rules.
+- **Environment‑agnostic deployment** – Deploy on Vercel, Netlify, Render, Cloudflare, or any static‑host with a simple server for the backend.
+
+## How the Application Works
+1. A user creates a **room**; the backend generates a unique room ID.
+2. Participants join the room by navigating to `/room/<room‑id>`.
+3. When a user starts a call, a **WebRTC peer‑connection** is created.
+4. **Socket.io** handles the signaling exchange (SDP offers/answers and ICE candidates) and routes chat messages.
+5. The media streams (camera, microphone, or screen) are attached to the peer‑connection and rendered in `<video>` elements.
+6. When a participant leaves or ends screen sharing, the connection is closed cleanly.
+
+## Tech Stack
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | **React + Vite** | Component‑based UI with fast dev/build tooling |
+| | **Tailwind CSS** | Utility‑first styling for responsive design |
+| | **WebRTC API** | Peer‑to‑peer media streaming |
+| | **Socket.io client** | Signaling and real‑time chat |
+| **Backend** | **Node.js (v18+)** | Server runtime |
+| | **Express** | HTTP API and static file serving |
+| | **Socket.io server** | Signaling channel for WebRTC |
+| | **dotenv** | Load environment variables |
+| **Deployment** | **Vercel** (with `vercel.json`) | SPA rewrite rules for static hosting |
+| | **_redirects** (Netlify/Render/Cloudflare) | Fallback rule for other hosts |
+| **Version Control** | **Git** | Source code management |
+
+## Running Locally
+### Prerequisites
+- **Node.js** (>= 18)
+- **npm** (>= 9) or **yarn**
+- **Git**
+
+### Steps
+```bash
+# Clone the repository
+git clone <repository‑url>
+cd watchParty
+
+# Install backend dependencies
+cd backend && npm install && cd ..
+
+# Install frontend dependencies
+cd frontend && npm install && cd ..
+```
+
+#### Environment variables
+Create a `.env` file inside the **frontend** folder (copy from `.env.example` if present) with:
+```env
+VITE_API_URL=http://localhost:7000/api
+VITE_SOCKET_URL=http://localhost:7000
+```
+The backend can read its own `.env` (e.g., `PORT=7000`).
+
+#### Development mode
+```bash
+# Start backend
+cd backend && npm run dev   # listens on PORT (default 7000)
+
+# In a new terminal, start frontend
+cd frontend && npm run dev   # Vite dev server (http://localhost:5173)
+```
+Open the Vite URL in a browser, create a room, and test video/screen‑share.
+
+#### Production build
+```bash
+# Build frontend
+cd frontend && npm run build
+# Serve backend (you may also serve the static build with any static host)
+cd ../backend && npm start
+```
+The built files are in `frontend/dist` (or `frontend/build`). Deploy that folder as a static site.
+
+## Environment Variables Required
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | Base URL for the backend REST API (used by the frontend). |
+| `VITE_SOCKET_URL` | URL of the Socket.io server for signaling and chat. |
+| `PORT` (backend) | Port on which the Express server listens (default 7000). |
+| `CORS_ORIGIN` (backend) | Allowed origin for Socket.io connections (e.g., `http://localhost:5173`). |
+
+## How WebRTC + Socket.io Are Used
+- **WebRTC** handles the actual media transport (camera, microphone, screen). It creates a `RTCPeerConnection` per participant and negotiates codecs, bitrate, and ICE candidates.
+- **Socket.io** is the signaling layer: peers emit `webrtc-offer`, `webrtc-answer`, and `webrtc-ice-candidate` events, which the server forwards to the appropriate room participants.
+- The server also broadcasts chat messages and room‑management events (join/leave).
+- Custom helpers (`mungeSdpBitrate`, `applyHighQualitySenderParameters`) adjust SDP to enforce high‑quality video and maintain resolution on flaky networks.
+
+## Deploying
+1. **Static Frontend** – Push the `frontend/build` (or `dist`) folder to Vercel, Netlify, Render, or Cloudflare. The repository already contains:
+   - `vercel.json` with a rewrite rule `{ "source": "/(.*)", "destination": "/index.html" }`
+   - `frontend/public/_redirects` with `/*    /index.html   200`
+2. **Backend** – Deploy the Express server to any Node‑compatible platform (Vercel Serverless Functions, Render, Railway, etc.). Ensure the environment variables (`PORT`, `CORS_ORIGIN`) are set.
+3. **Configure URLs** – Update `VITE_API_URL` and `VITE_SOCKET_URL` in the frontend `.env` to point to the deployed backend.
+4. **Optional** – Use a managed STUN/TURN service (e.g., `stun:stun.l.google.com:19302`) for better NAT traversal.
+
+---
+*Viewly – simple, high‑quality video calls and screen sharing, built for the modern web.*
 
 ## 1. Overview
 A web app where a small group of friends can join a shared "room," watch a video together (synced playback + live video/screen sharing), and chat in real time. This is a beginner-friendly build, sequenced after your chat app project so you can reuse auth and get comfortable with real-time features before tackling media streaming.
@@ -12,7 +119,7 @@ A web app where a small group of friends can join a shared "room," watch a video
 
 ## 3. Non-Goals (v1)
 - No avatars (planned for a later version).
-- No support for large rooms (100s of users) — target 2–6 people per room.
+- No support for large rooms (100s of users) — target 2–10 people per room.
 - No mobile app — responsive web only.
 - No content licensing/DRM handling for copyrighted streaming platforms — screen share is user-driven, not a Netflix-style sync.
 - No recording/playback-later feature.
