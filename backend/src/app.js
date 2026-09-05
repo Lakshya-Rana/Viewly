@@ -41,8 +41,6 @@ app.use(
 const roomPresenters = {};
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
   // Join room
   socket.on("join-room", ({ roomId, displayName }) => {
     socket.join(roomId);
@@ -171,8 +169,6 @@ io.on("connection", (socket) => {
         io.to(roomId).emit("screen-share-stopped");
       }
     }
-
-    console.log("User disconnected:", socket.id);
   });
 });
 

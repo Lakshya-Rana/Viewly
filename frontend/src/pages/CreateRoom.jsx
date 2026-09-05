@@ -96,14 +96,14 @@ const CreateRoom = () => {
           <Link to="/" className="flex items-center gap-3">
             <img
   src="/logo.png"
-  alt="Watchly"
+  alt="Viewly"
   width={50}
   height={50}
   className="rounded-full object-cover"
 />
 
             <span className="text-lg font-bold">
-              Watchly<span className="text-violet-400"></span>
+              Viewly<span className="text-violet-400"></span>
             </span>
           </Link>
 

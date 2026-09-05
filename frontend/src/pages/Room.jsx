@@ -76,7 +76,6 @@ const applyHighQualitySenderParameters = async (pc) => {
     parameters.degradationPreference = "maintain-resolution"; // Prevent WebRTC from dropping 1080p resolution
 
     await videoSender.setParameters(parameters);
-    console.log("🚀 WebRTC 1080p high-quality parameters applied successfully");
   } catch (err) {
     console.warn("Could not apply WebRTC sender parameters:", err);
   }
@@ -276,7 +275,6 @@ const Room = () => {
     socket.connect();
 
     const handleConnect = () => {
-      console.log("🟢 Socket connected:", socket.id);
       socket.emit("join-room", { roomId, displayName });
     };
 
@@ -975,15 +973,15 @@ const Room = () => {
       {/* NAVBAR */}
       <nav className="border-b border-white/10 bg-[#08090d]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-5">
-          {/* Watchly Logo */}
+          {/* Viewly Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
             <img
                           src="/logo.png"
-                          alt="Watchly"
+                          alt="Viewly"
                           className="h-11 w-11 rounded-full object-cover"
                         />
             <span className="text-lg font-black tracking-tight text-white sm:text-xl">
-              Watchly</span>
+              Viewly</span>
 
           </Link>
 

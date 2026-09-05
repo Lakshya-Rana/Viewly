@@ -107,14 +107,14 @@ const JoinRoom = () => {
           >
             <img
   src="/logo.png"
-  alt="Watchly"
+  alt="Viewly"
   width={50}
   height={50}
   className="rounded-full object-cover"
 />
 
             <span className="text-lg font-bold">
-              Watchly
+              Viewly
               <span className="text-violet-400">
               
               </span>

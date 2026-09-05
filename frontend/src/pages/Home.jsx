@@ -83,13 +83,13 @@ const Home = () => {
           <Link to="/" className="flex items-center gap-3">
             <img
   src="/logo.png"
-  alt="Watchly"
+  alt="Viewly"
   className="rounded-full object-cover h-9 w-9"
 />
 
             <div className="flex flex-col">
               <span className="text-lg font-bold tracking-tight">
-                Watchly<span className="text-violet-400"></span>
+                Viewly<span className="text-violet-400"></span>
               </span>
             </div>
           </Link>
