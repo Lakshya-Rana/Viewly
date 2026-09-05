@@ -30,7 +30,56 @@ const RTC_CONFIG = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
+    { urls: "stun:stun.services.mozilla.com" },
   ],
+  sdpSemantics: "unified-plan",
+};
+
+// Helper: Munge SDP to force higher video bandwidth (in kbps)
+const mungeSdpBitrate = (sdp, bitrateKbps = 8000) => {
+  if (!sdp) return sdp;
+  let lines = sdp.split("\r\n");
+  const videoIndex = lines.findIndex((line) => line.startsWith("m=video"));
+  if (videoIndex === -1) return sdp;
+
+  const hasBandwidth = lines.some((line, idx) => idx > videoIndex && line.startsWith("b=AS:"));
+  if (!hasBandwidth) {
+    lines.splice(videoIndex + 1, 0, `b=AS:${bitrateKbps}`);
+  }
+
+  const fmtpLineIndex = lines.findIndex((line, idx) => idx > videoIndex && line.startsWith("a=fmtp:"));
+  if (fmtpLineIndex !== -1) {
+    lines[fmtpLineIndex] += `;x-google-max-bitrate=${bitrateKbps};x-google-min-bitrate=2500;x-google-start-bitrate=5000`;
+  }
+
+  return lines.join("\r\n");
+};
+
+// Helper: Apply WebRTC video sender encoding parameters (maintain resolution + max bitrate)
+const applyHighQualitySenderParameters = async (pc) => {
+  const senders = pc.getSenders();
+  const videoSender = senders.find((s) => s.track && s.track.kind === "video");
+  if (!videoSender || !videoSender.getParameters) return;
+
+  try {
+    const parameters = videoSender.getParameters();
+    if (!parameters.encodings || parameters.encodings.length === 0) {
+      parameters.encodings = [{}];
+    }
+    parameters.encodings[0].maxBitrate = 8000000; // 8 Mbps max
+    parameters.encodings[0].minBitrate = 2500000; // 2.5 Mbps minimum to prevent low-res degradation
+    parameters.encodings[0].scaleResolutionDownBy = 1.0; // Force 100% resolution scaling
+    parameters.degradationPreference = "maintain-resolution"; // Prevent WebRTC from dropping 1080p resolution
+
+    await videoSender.setParameters(parameters);
+    console.log("🚀 WebRTC 1080p high-quality parameters applied successfully");
+  } catch (err) {
+    console.warn("Could not apply WebRTC sender parameters:", err);
+  }
 };
 
 const Room = () => {
@@ -282,25 +331,6 @@ const Room = () => {
 
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-      // Optimize WebRTC Video Bitrate for 1080p stream
-      const senders = pc.getSenders();
-      const videoSender = senders.find((s) => s.track && s.track.kind === "video");
-      if (videoSender && videoSender.getParameters) {
-        try {
-          const parameters = videoSender.getParameters();
-          if (!parameters.encodings || parameters.encodings.length === 0) {
-            parameters.encodings = [{}];
-          }
-          parameters.encodings[0].maxBitrate = 5000000; // 5 Mbps max bitrate for crisp 1080p
-          parameters.encodings[0].maxFramerate = 30;
-          videoSender.setParameters(parameters).catch((err) => {
-            console.warn("Could not set video bitrate parameters:", err);
-          });
-        } catch (e) {
-          console.warn("Failed to update video sender parameters:", e);
-        }
-      }
-
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("webrtc-ice-candidate", {
@@ -311,12 +341,23 @@ const Room = () => {
         }
       };
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const offer = await pc.createOffer({
+        offerToReceiveVideo: false,
+        offerToReceiveAudio: false,
+      });
+
+      const mungedSdp = mungeSdpBitrate(offer.sdp, 8000);
+      const mungedOffer = new RTCSessionDescription({
+        type: offer.type,
+        sdp: mungedSdp,
+      });
+
+      await pc.setLocalDescription(mungedOffer);
+      await applyHighQualitySenderParameters(pc);
 
       socket.emit("webrtc-offer", {
         targetSocketId: viewerSocketId,
-        offer,
+        offer: mungedOffer,
         senderSocketId: socket.id,
       });
     } catch (err) {
@@ -331,35 +372,73 @@ const Room = () => {
       return;
     }
 
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert(
+        "Screen sharing is not supported on this browser. On mobile devices, please use modern Chrome for Android or Safari on iOS 13+."
+      );
+      return;
+    }
+
+    let stream = null;
+
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      // Primary Attempt: Try ideal resolution constraints with audio
+      stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: "always",
-          width: { ideal: 1920, max: 1920 },
-          height: { ideal: 1080, max: 1080 },
+          displaySurface: "browser",
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
           frameRate: { ideal: 30, max: 60 },
         },
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
-
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack && "contentHint" in videoTrack) {
-        videoTrack.contentHint = "motion";
+    } catch (primaryErr) {
+      console.warn("Primary screen share request failed, attempting mobile fallback...", primaryErr);
+      if (primaryErr.name === "NotAllowedError") {
+        return; // User canceled the screen share dialog
       }
 
-      localStreamRef.current = stream;
-      setScreenStream(stream);
-      setIsSharingScreen(true);
-      setActivePresenter({ socketId: socket.id, displayName });
+      try {
+        // Fallback Attempt for Mobile (iOS Safari & Android Chrome): video-only without audio or rigid constraints
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+        });
+      } catch (fallbackErr) {
+        console.error("Mobile fallback screen share error:", fallbackErr);
+        if (fallbackErr.name === "NotAllowedError") {
+          return;
+        }
+        alert(
+          "Could not start screen share on your mobile device. Please ensure screen recording permissions are allowed in system settings."
+        );
+        return;
+      }
+    }
 
+    if (!stream) return;
+
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack && "contentHint" in videoTrack) {
+      videoTrack.contentHint = "motion";
+    }
+
+    localStreamRef.current = stream;
+    setScreenStream(stream);
+    setIsSharingScreen(true);
+    setActivePresenter({ socketId: socket.id, displayName });
+
+    if (videoTrack) {
       videoTrack.onended = () => {
         stopScreenShare();
       };
-
-      socket.emit("start-screen-share", { roomId, displayName });
-    } catch (err) {
-      console.error("Screen share error:", err);
     }
+
+    socket.emit("start-screen-share", { roomId, displayName });
   };
 
   // Initiate Audio WebRTC Offer for Voice Call
@@ -722,11 +801,17 @@ const Room = () => {
         await processPendingCandidates(senderSocketId, pc);
 
         const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+        const mungedSdp = mungeSdpBitrate(answer.sdp, 8000);
+        const mungedAnswer = new RTCSessionDescription({
+          type: answer.type,
+          sdp: mungedSdp,
+        });
+
+        await pc.setLocalDescription(mungedAnswer);
 
         socket.emit("webrtc-answer", {
           targetSocketId: senderSocketId,
-          answer,
+          answer: mungedAnswer,
           senderSocketId: socket.id,
         });
       } catch (err) {
@@ -740,6 +825,7 @@ const Room = () => {
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
           await processPendingCandidates(senderSocketId, pc);
+          await applyHighQualitySenderParameters(pc);
         } catch (err) {
           console.error("Error setting answer remote description:", err);
         }
@@ -978,8 +1064,24 @@ const Room = () => {
                       ref={videoRef}
                       autoPlay
                       playsInline
+                      webkit-playsinline="true"
+                      x5-playsinline="true"
                       className="h-full w-full object-contain"
                     />
+
+                    {/* MOBILE / VIEWER TAP TO UNMUTE OVERLAY BADGE */}
+                    {isAudioMuted && !isSharingScreen && (
+                      <button
+                        onClick={() => {
+                          setIsAudioMuted(false);
+                          setVolume(1);
+                        }}
+                        className="absolute top-4 left-4 z-20 flex items-center gap-2 rounded-full border border-violet-400/40 bg-violet-600/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-xl backdrop-blur transition hover:bg-violet-500 active:scale-95"
+                      >
+                        <VolumeX size={15} />
+                        <span>Tap for Audio</span>
+                      </button>
+                    )}
 
                     {/* FULLSCREEN FLOATING LIVE CHAT */}
                     {isFullscreen && (
